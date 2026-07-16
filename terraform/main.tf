@@ -1,5 +1,13 @@
 terraform {
   required_version = ">= 1.3.0"
+  
+  backend "s3" {
+    bucket         = "devsecops-eks-pipeline-tfstate-873152457440"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "devsecops-eks-pipeline-tflock"
+    encrypt        = true
+  }
 
   required_providers {
     aws = {
@@ -10,11 +18,39 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.20"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
+    }
   }
 }
 
 provider "aws" {
   region = var.aws_region
+}
+
+provider "kubernetes" {
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "aws"
+    args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args        = ["eks", "get-token", "--cluster-name", module.eks.cluster_name]
+    }
+  }
 }
 
 # Create ECR Repository for our images
@@ -93,6 +129,12 @@ resource "aws_iam_role_policy" "github_actions_ecr_policy" {
       }
     ]
   })
+}
+
+# Grant the GitHub Actions role AdministratorAccess so it can run Terraform
+resource "aws_iam_role_policy_attachment" "github_actions_admin" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
 output "github_actions_role_arn" {
