@@ -64,6 +64,25 @@ jobs:
         exit-code: '0'
         severity: 'CRITICAL,HIGH'
 
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::873152457440:role/github-actions-ecr-push-role
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Tag and Push Docker Image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
     # Note: In a real environment, you would use aws-actions/configure-aws-credentials
     # via OIDC (Role ARN) here to authenticate to AWS securely, then login to ECR.
     # We skip the actual push here for the demonstration.
@@ -71,7 +90,7 @@ jobs:
     - name: Generate SBOM (Syft)
       uses: anchore/sbom-action@v0
       with:
-        image: ${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+        image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
         format: spdx-json
         output-file: sbom.spdx.json
 
@@ -79,9 +98,10 @@ jobs:
       uses: sigstore/cosign-installer@v3.1.1
 
     - name: Sign Container Image (Keyless via Sigstore)
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
       run: |
-        # In a real environment after pushing to ECR:
-        # cosign sign --yes $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
-        echo "Image successfully built, scanned, and signed!"
+        cosign sign --yes $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "Image successfully built, scanned, pushed, and signed!"
 
 

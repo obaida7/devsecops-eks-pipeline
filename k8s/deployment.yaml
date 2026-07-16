@@ -32,7 +32,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: finance-api
-        image: REPLACE_ME_IMAGE_URI:latest
+        image: 873152457440.dkr.ecr.us-east-1.amazonaws.com/finance-api:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
