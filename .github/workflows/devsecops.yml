@@ -83,15 +83,4 @@ jobs:
         # cosign sign --yes $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
         echo "Image successfully built, scanned, and signed!"
 
-  deploy-to-eks:
-    needs: security-and-build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
 
-    - name: Deploy to Kubernetes
-      run: |
-        # Setup kubectl and AWS authentication via OIDC
-        # kubectl apply -f k8s/
-        echo "Deploying to EKS Cluster..."
